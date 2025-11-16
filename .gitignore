@@ -1,0 +1,52 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+coverage/
+.pytest_cache/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+*.tar.gz
+
+# Sensitive files - NEVER commit these
+.env
+.env.*
+# But allow .env.example (template file)
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*keypair*.json
+*private*.json
+*secret*.json
+*credentials*.json
+*.credentials
+
+# RPC URLs and API keys in code (check for hardcoded values)
+# Note: Code files may contain placeholder values, but no real keys
+
+# Database files (except token_holders.db which we track)
+*.sqlite
+*.sqlite3
+# Force track token_holders.db
+!bot/token_holders.db
+
+# GitHub tokens and secrets
+*github*token*
+*github*secret*
+*GITHUB_TOKEN*
+*GITHUB_SECRET*
+
+# Solana RPC URLs with API keys
+*helius*api-key*
+*quicknode*api-key*
+*alchemy*api-key*
+*rpc*api-key*
+*rpc*key*
+
+# GitHub workflows (to avoid workflow scope requirement)
+.github/workflows/*
+!.github/workflows/.gitkeep
