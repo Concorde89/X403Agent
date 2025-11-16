@@ -39,7 +39,6 @@ if TOKEN_MINT:
     try:
         solana_fetcher = SolanaDataFetcher(SOLANA_RPC_URL, TOKEN_MINT, api_key=HELIUS_API_KEY)
         print(f"✅ Initialized Solana fetcher for token: {TOKEN_MINT}")
-        print(f"📡 Using RPC endpoint: {SOLANA_RPC_URL}")
         if HELIUS_API_KEY:
             print(f"🔑 Helius API key detected - enhanced API methods enabled")
     except Exception as e:
@@ -217,7 +216,6 @@ if __name__ == "__main__":
     else:
         print(f"📄 Configuration: Using environment variables")
     print(f"📡 Server: http://{host}:{port}")
-    print(f"🌐 Solana RPC: {SOLANA_RPC_URL}")
     print(f"🪙 Token Mint: {TOKEN_MINT if TOKEN_MINT else 'Not configured (set TOKEN_MINT in .env)'}")
     print(f"✅ Solana Fetcher: {'Initialized' if solana_fetcher else 'Not configured'}")
     if not TOKEN_MINT:

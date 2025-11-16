@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from solders.keypair import Keypair
 from openkitx403_client import OpenKit403Client
 from database import TokenHolderDB
-from git_publisher import publish_database
+from git_publisher import publish_csv
+from csv_export import export_to_csv
 
 # Load environment variables from .env file
 # Try to load from server directory first, then project root
@@ -95,21 +96,26 @@ def main():
                 print(f"      - Dropped from top: {stats['dropped_from_top']}")
                 print(f"      - Added to top: {stats['added_to_top']}")
                 
-                # Publish database to GitHub
-                print("\n📤 Publishing database to GitHub...")
+                # Export to CSV and publish to GitHub
+                print("\n📊 Exporting to CSV...")
                 try:
+                    csv_path = export_to_csv(db, "token_holders.csv")
+                    print(f"   ✅ CSV exported: {csv_path}")
+                    
+                    # Publish CSV to GitHub
+                    print("\n📤 Publishing CSV to GitHub...")
                     github_token = os.getenv('GITHUB_TOKEN')
                     if github_token:
                         print("   🔑 Using GitHub token from environment")
                     else:
                         print("   ⚠️  No GITHUB_TOKEN found in .env file")
                     
-                    # Use X403Agent repository for database publishing
+                    # Use X403Agent repository for CSV publishing
                     repo_name = os.getenv('GITHUB_REPO_NAME', 'X403Agent')
-                    github_username = os.getenv('GITHUB_USERNAME', 'Concorde89')  # Get from API if needed
+                    github_username = os.getenv('GITHUB_USERNAME', 'Concorde89')
                     
-                    publish_result = publish_database(
-                        db_path=db_path,
+                    publish_result = publish_csv(
+                        csv_path=csv_path,
                         repo_path="..",
                         branch=os.getenv('GIT_BRANCH', 'main'),
                         push=os.getenv('GIT_PUSH', 'true').lower() == 'true',
@@ -128,12 +134,14 @@ def main():
                             print(f"   ⚠️  Push: {publish_result['push']['message']}")
                     
                     if publish_result["success"]:
-                        print("   ✅ Database published successfully")
+                        print("   ✅ CSV published successfully to GitHub")
                     else:
-                        print("   ⚠️  Database commit succeeded but push may have failed")
+                        print("   ⚠️  CSV commit succeeded but push may have failed")
                 except Exception as e:
-                    print(f"   ⚠️  Failed to publish to GitHub: {e}")
-                    print("   (Database saved locally, but not pushed to GitHub)")
+                    print(f"   ⚠️  Failed to export/publish CSV: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    print("   (Database saved locally, but CSV not published)")
                 
                 # 3. Process data (simulate work)
                 print("⚙️  Processing data...")
@@ -167,9 +175,11 @@ def main():
                 print(f"✅ Bot status: {status['status']}")
                 print(f"   Tasks completed: {status['tasks_completed']}")
                 
-                # Wait before next run (3 minutes)
-                print("\n😴 Waiting 3 minutes before next run...")
-                time.sleep(180)  # 3 minutes = 180 seconds
+                # Wait before next run (configurable via BOT_RUN_INTERVAL_MINUTES)
+                run_interval_minutes = int(os.getenv('BOT_RUN_INTERVAL_MINUTES', '5'))
+                run_interval_seconds = run_interval_minutes * 60
+                print(f"\n😴 Waiting {run_interval_minutes} minutes before next run...")
+                time.sleep(run_interval_seconds)
                 
             except Exception as e:
                 print(f"❌ Error: {e}")

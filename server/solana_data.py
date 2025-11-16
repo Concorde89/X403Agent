@@ -69,7 +69,6 @@ class SolanaDataFetcher:
             decimals = token_info.get("decimals", 9)
             
             print(f"🔍 Fetching holders for token: {self.token_mint}")
-            print(f"   Using RPC: {self.rpc_url}")
             # getTokenLargestAccounts always returns top 20, so limit is effectively 20
             effective_limit = min(limit, 20)
             print(f"   Requesting top {effective_limit} holders (getTokenLargestAccounts returns max 20)")

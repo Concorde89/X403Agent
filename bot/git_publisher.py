@@ -343,24 +343,28 @@ def git_push(repo_path="..", branch="main", github_token=None, target_repo=None,
                 if bot_dir not in sys.path:
                     sys.path.insert(0, bot_dir)
                 
-                from push_to_x403agent import push_database_to_x403agent
+                from push_to_x403agent import push_file_to_x403agent
                 
-                # Get the absolute path to the database file
-                # db_path parameter should be relative to bot directory
+                # Get the absolute path to the file
+                # file_path parameter should be relative to bot directory
                 if os.path.isabs(db_path):
-                    abs_db_file = db_path
+                    abs_file = db_path
                 else:
-                    abs_db_file = os.path.join(bot_dir, db_path)
+                    abs_file = os.path.join(bot_dir, db_path)
                 
                 # Get relative path from bot directory
-                db_file = os.path.relpath(abs_db_file, bot_dir)
+                file_rel = os.path.relpath(abs_file, bot_dir)
                 
-                # Use clean push method that creates a fresh repo with only the database
+                # Determine file type
+                file_type = "csv" if file_rel.endswith(".csv") else "database"
+                
+                # Use clean push method that creates a fresh repo with only the file
                 # This avoids workflow file issues from the main repo's history
-                push_result = push_database_to_x403agent(
-                    db_path=db_file,
+                push_result = push_file_to_x403agent(
+                    file_path=file_rel,
                     github_token=github_token,
-                    github_username=github_username
+                    github_username=github_username,
+                    file_type=file_type
                 )
                 return push_result
             except Exception as e:
@@ -410,6 +414,181 @@ def git_push(repo_path="..", branch="main", github_token=None, target_repo=None,
             "success": False,
             "message": f"Error: {str(e)}"
         }
+
+def git_add_and_commit_csv(csv_path, repo_path=".."):
+    """
+    Add and commit CSV file to git repository
+    
+    Args:
+        csv_path: Path to CSV file (relative to bot directory)
+        repo_path: Path to git repository root
+        
+    Returns:
+        dict with success status and message
+    """
+    try:
+        bot_dir = os.path.dirname(os.path.abspath(__file__))
+        abs_repo_path = os.path.abspath(os.path.join(bot_dir, repo_path))
+        
+        # Get absolute path to CSV file
+        if os.path.isabs(csv_path):
+            abs_csv_path = csv_path
+        else:
+            abs_csv_path = os.path.join(bot_dir, csv_path)
+        
+        # Get relative path from repo root
+        rel_csv_path = os.path.relpath(abs_csv_path, abs_repo_path)
+        
+        # Check if CSV file exists
+        if not os.path.exists(abs_csv_path):
+            return {
+                "success": False,
+                "message": f"CSV file not found: {abs_csv_path}"
+            }
+        
+        # Reset any staged files
+        subprocess.run(["git", "reset"], cwd=abs_repo_path, capture_output=True, timeout=5)
+        
+        # Add CSV file
+        subprocess.run(
+            ["git", "add", "-f", rel_csv_path],
+            cwd=abs_repo_path,
+            capture_output=True,
+            timeout=5
+        )
+        
+        # Configure git user if needed
+        user_name = subprocess.run(
+            ["git", "config", "user.name"],
+            cwd=abs_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if not user_name.stdout.strip():
+            subprocess.run(
+                ["git", "config", "user.name", "X403 Bot"],
+                cwd=abs_repo_path,
+                capture_output=True,
+                timeout=5
+            )
+        
+        user_email = subprocess.run(
+            ["git", "config", "user.email"],
+            cwd=abs_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if not user_email.stdout.strip():
+            subprocess.run(
+                ["git", "config", "user.email", "bot@x403.local"],
+                cwd=abs_repo_path,
+                capture_output=True,
+                timeout=5
+            )
+        
+        # Check if there are changes
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=abs_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        staged_files = [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
+        
+        if not staged_files:
+            return {
+                "success": True,
+                "message": "No changes to commit (CSV unchanged)"
+            }
+        
+        # Commit the CSV file
+        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+        commit_message = f"Update token holders CSV - {timestamp}"
+        
+        result = subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            cwd=abs_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            error_msg = result.stderr.strip()
+            if "nothing to commit" in error_msg.lower():
+                return {
+                    "success": True,
+                    "message": "No changes to commit (CSV unchanged)"
+                }
+            return {
+                "success": False,
+                "message": f"Failed to commit: {error_msg}"
+            }
+        
+        return {
+            "success": True,
+            "message": f"Committed CSV update: {commit_message}"
+        }
+        
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "message": "Git operation timed out"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }
+
+def publish_csv(csv_path="token_holders.csv", repo_path="..", branch="main", push=True, github_token=None, target_repo=None, github_username=None):
+    """
+    Publish CSV file to GitHub (commit and optionally push)
+    
+    Args:
+        csv_path: Path to CSV file
+        repo_path: Path to git repository root
+        branch: Branch name
+        push: Whether to push to remote (default: True)
+        github_token: GitHub Personal Access Token for authentication
+        target_repo: Target repository name (e.g., 'X403Agent')
+        github_username: GitHub username (will be fetched from API if not provided)
+    
+    Returns:
+        dict with success status and messages
+    """
+    result = {
+        "commit": None,
+        "push": None,
+        "success": False
+    }
+    
+    # Commit CSV
+    commit_result = git_add_and_commit_csv(csv_path, repo_path)
+    result["commit"] = commit_result
+    
+    if not commit_result["success"]:
+        return result
+    
+    # Push to GitHub if requested
+    if push and commit_result["message"] != "No changes to commit (CSV unchanged)":
+        push_result = git_push(repo_path, branch, github_token, target_repo, github_username, csv_path)
+        result["push"] = push_result
+        result["success"] = push_result["success"]
+    else:
+        result["success"] = True
+        if not push:
+            result["push"] = {"success": True, "message": "Push skipped (push=False)"}
+        else:
+            result["push"] = {"success": True, "message": "No push needed (no changes)"}
+    
+    return result
 
 def publish_database(db_path="token_holders.db", repo_path="..", branch="main", push=True, github_token=None, target_repo=None, github_username=None):
     """

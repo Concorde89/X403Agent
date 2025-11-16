@@ -16,19 +16,25 @@ for env_path in env_paths:
         load_dotenv(env_path)
         break
 
-def push_database_to_x403agent(db_path="token_holders.db", github_token=None, github_username="Concorde89"):
+def push_file_to_x403agent(file_path, github_token=None, github_username="Concorde89", file_type="database"):
     """
-    Push only the database file to X403Agent repository
+    Push a file (database or CSV) to X403Agent repository
     Uses a clean git repository to avoid workflow file issues
+    
+    Args:
+        file_path: Path to file to push (database or CSV)
+        github_token: GitHub token
+        github_username: GitHub username
+        file_type: Type of file ("database" or "csv")
     """
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        abs_db_path = os.path.join(script_dir, db_path)
+        abs_file_path = os.path.join(script_dir, file_path)
         
-        if not os.path.exists(abs_db_path):
+        if not os.path.exists(abs_file_path):
             return {
                 "success": False,
-                "message": f"Database file not found: {abs_db_path}"
+                "message": f"File not found: {abs_file_path}"
             }
         
         if not github_token:
@@ -68,14 +74,14 @@ def push_database_to_x403agent(db_path="token_holders.db", github_token=None, gi
                 timeout=5
             )
             
-            # Copy database file
-            db_filename = os.path.basename(db_path)
-            temp_db_path = os.path.join(temp_dir, db_filename)
-            shutil.copy2(abs_db_path, temp_db_path)
+            # Copy file
+            file_filename = os.path.basename(file_path)
+            temp_file_path = os.path.join(temp_dir, file_filename)
+            shutil.copy2(abs_file_path, temp_file_path)
             
             # Add and commit
             subprocess.run(
-                ["git", "add", db_filename],
+                ["git", "add", file_filename],
                 cwd=temp_dir,
                 check=True,
                 capture_output=True,
@@ -84,7 +90,10 @@ def push_database_to_x403agent(db_path="token_holders.db", github_token=None, gi
             
             from datetime import datetime
             timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
-            commit_message = f"Update token holders database - {timestamp}"
+            if file_type == "csv":
+                commit_message = f"Update token holders CSV - {timestamp}"
+            else:
+                commit_message = f"Update token holders database - {timestamp}"
             
             subprocess.run(
                 ["git", "commit", "-m", commit_message],
@@ -117,7 +126,7 @@ def push_database_to_x403agent(db_path="token_holders.db", github_token=None, gi
                 if result.returncode == 0:
                     return {
                         "success": True,
-                        "message": f"Pushed database to X403Agent (branch: {branch})"
+                        "message": f"Pushed {file_type} to X403Agent (branch: {branch})"
                     }
                 last_error = result.stderr
             
@@ -136,8 +145,12 @@ def push_database_to_x403agent(db_path="token_holders.db", github_token=None, gi
             "message": f"Error: {str(e)}"
         }
 
+def push_database_to_x403agent(db_path="token_holders.db", github_token=None, github_username="Concorde89"):
+    """Legacy function - pushes database file"""
+    return push_file_to_x403agent(db_path, github_token, github_username, "database")
+
 if __name__ == "__main__":
-    result = push_database_to_x403agent()
+    result = push_file_to_x403agent("token_holders.csv", file_type="csv")
     print(f"Success: {result['success']}")
     print(f"Message: {result['message']}")
 
